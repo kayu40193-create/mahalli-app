@@ -764,7 +764,11 @@ class _HomePageState extends State<HomePage> {
                                 if (!dialogContext.mounted) return;
 if (!mounted || !dialogContext.mounted) return;
 
+if (!mounted || !dialogContext.mounted) return;
+
 Navigator.pop(dialogContext);
+
+if (!mounted) return;
 
 setState(() {
   currentUser = Supabase.instance.client.auth.currentUser;
