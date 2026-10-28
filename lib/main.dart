@@ -648,7 +648,7 @@ class _HomePageState extends State<HomePage> {
                   Text('$quantity'),
                   IconButton(
                     onPressed: () {
-                      setState(() {
+                      (() {
                         cart[product.name] = quantity + 1;
                       });
                     },
@@ -762,18 +762,19 @@ class _HomePageState extends State<HomePage> {
                                 }
 
                                 if (!dialogContext.mounted) return;
+if (!mounted || !dialogContext.mounted) return;
 
-                                setState(() {
-                                  currentUser = Supabase
-                                      .instance.client.auth.currentUser;
-                                });
+Navigator.pop(dialogContext);
 
-                                Navigator.pop(dialogContext);
-                                showMessage(
-                                  isRegister
-                                      ? 'تم إنشاء الحساب بنجاح'
-                                      : 'تم تسجيل الدخول بنجاح',
-                                );
+setState(() {
+  currentUser = Supabase.instance.client.auth.currentUser;
+});
+
+showMessage(
+  isRegister
+      ? 'تم إنشاء الحساب بنجاح'
+      : 'تم تسجيل الدخول بنجاح',
+);
                               } catch (error) {
                                 setDialogState(() {
                                   errorMessage =
