@@ -3,12 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Supabase.initialize(
     url: 'https://dmlvymwzsmbzfxgqyafx.supabase.co',
-    publishableKey: 'ضع_المفتاح_العام_هنا',
+    publishableKey: 'sb_publishable_CiJl0yHA-MI24qCo-BKeDg_BNqPt5Na',
   );
+
   runApp(const MahalliApp());
 }
+
 const Color mahalliGreen = Color(0xFF087F5B);
 const Color backgroundColor = Color(0xFFF6F8F7);
 
