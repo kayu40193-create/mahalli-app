@@ -133,6 +133,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  User? currentUser = Supabase.instance.client.auth.currentUser;
   int selectedTab = 0;
   String selectedCategory = 'الكل';
   String searchText = '';
@@ -660,8 +661,199 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
   Widget buildAccountPage() {
+    Future<void> showAuthDialog(bool isRegister) async {
+      final emailController = TextEditingController();
+      final passwordController = TextEditingController();
+      bool isLoading = false;
+      String? errorMessage;
+
+      try {
+        await showDialog(
+          context: context,
+          builder: (dialogContext) {
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                return AlertDialog(
+                  title: Text(
+                    isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                  ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'البريد الإلكتروني',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'كلمة المرور',
+                            prefixIcon: Icon(Icons.lock_outline),
+                          ),
+                        ),
+                        if (errorMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () => Navigator.pop(dialogContext),
+                      child: const Text('إلغاء'),
+                    ),
+                    FilledButton(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final email = emailController.text.trim();
+                              final password = passwordController.text;
+
+                              if (email.isEmpty || password.isEmpty) {
+                                setDialogState(() {
+                                  errorMessage =
+                                      'أدخل البريد الإلكتروني وكلمة المرور';
+                                });
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isLoading = true;
+                                errorMessage = null;
+                              });
+
+                              try {
+                                if (isRegister) {
+                                  final response = await Supabase
+                                      .instance.client.auth
+                                      .signUp(
+                                    email: email,
+                                    password: password,
+                                  );
+
+                                  if (response.session == null) {
+                                    if (!mounted) return;
+                                    Navigator.pop(dialogContext);
+                                    showMessage(
+                                      'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.',
+                                    );
+                                    return;
+                                  }
+                                } else {
+                                  await Supabase.instance.client.auth
+                                      .signInWithPassword(
+                                    email: email,
+                                    password: password,
+                                  );
+                                }
+
+                                if (!mounted) return;
+
+                                setState(() {
+                                  currentUser = Supabase
+                                      .instance.client.auth.currentUser;
+                                });
+
+                                Navigator.pop(dialogContext);
+                                showMessage(
+                                  isRegister
+                                      ? 'تم إنشاء الحساب بنجاح'
+                                      : 'تم تسجيل الدخول بنجاح',
+                                );
+                              } catch (error) {
+                                setDialogState(() {
+                                  errorMessage =
+                                      'تعذر إتمام العملية. تحقق من البيانات وحاول مجددًا.';
+                                  isLoading = false;
+                                });
+                              }
+                            },
+                      child: Text(
+                        isLoading
+                            ? 'يرجى الانتظار...'
+                            : isRegister
+                                ? 'إنشاء الحساب'
+                                : 'دخول',
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      } finally {
+        emailController.dispose();
+        passwordController.dispose();
+      }
+    }
+
+    if (currentUser != null) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const SizedBox(height: 25),
+          const CircleAvatar(
+            radius: 42,
+            backgroundColor: Color(0xFFDDF4E4),
+            child: Icon(Icons.person, size: 48, color: mahalliGreen),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'أهلًا بك في محلّي',
+              style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(child: Text(currentUser!.email ?? '')),
+          const SizedBox(height: 25),
+          FilledButton.icon(
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (!mounted) return;
+              setState(() {
+                currentUser = null;
+              });
+              showMessage('تم تسجيل الخروج');
+            },
+            icon: const Icon(Icons.logout),
+            label: const Text('تسجيل الخروج'),
+          ),
+          const SizedBox(height: 12),
+          accountOption(
+            Icons.receipt_long,
+            'طلباتي',
+            'قريبًا',
+          ),
+          accountOption(
+            Icons.support_agent,
+            'المساعدة والدعم',
+            'قريبًا',
+          ),
+          accountOption(
+            Icons.info_outline,
+            'عن محلّي',
+            'سوق المتاجر المحلي',
+          ),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -681,16 +873,33 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 8),
         const Center(
           child: Text(
-            'حسابك يجمع مشترياتك ومتجرك في مكان واحد',
+            'سجّل دخولك لتجربة تسوق أفضل',
             textAlign: TextAlign.center,
           ),
         ),
         const SizedBox(height: 25),
-        accountOption(Icons.login, 'تسجيل الدخول', 'قريبًا'),
-        accountOption(Icons.storefront, 'إنشاء متجر', 'قريبًا'),
-        accountOption(Icons.receipt_long, 'طلباتي', 'قريبًا'),
-        accountOption(Icons.support_agent, 'المساعدة والدعم', 'قريبًا'),
-        accountOption(Icons.info_outline, 'عن محلّي', 'سوق المتاجر المحلي'),
+        FilledButton.icon(
+          onPressed: () => showAuthDialog(false),
+          icon: const Icon(Icons.login),
+          label: const Text('تسجيل الدخول'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => showAuthDialog(true),
+          icon: const Icon(Icons.person_add_alt_1),
+          label: const Text('إنشاء حساب جديد'),
+        ),
+        const SizedBox(height: 20),
+        accountOption(
+          Icons.support_agent,
+          'المساعدة والدعم',
+          'قريبًا',
+        ),
+        accountOption(
+          Icons.info_outline,
+          'عن محلّي',
+          'سوق المتاجر المحلي',
+        ),
       ],
     );
   }
