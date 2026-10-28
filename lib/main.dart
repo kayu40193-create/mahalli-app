@@ -1,122 +1,653 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MahalliApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+const Color mahalliGreen = Color(0xFF087F5B);
+const Color backgroundColor = Color(0xFFF6F8F7);
 
-  // This widget is the root of your application.
+class MahalliApp extends StatelessWidget {
+  const MahalliApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'محلّي',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: mahalliGreen),
+        scaffoldBackgroundColor: backgroundColor,
+        fontFamily: 'Roboto',
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: HomePage(),
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class Product {
+  final String name;
+  final String category;
+  final String store;
+  final double price;
+  final IconData icon;
+  final Color color;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  const Product({
+    required this.name,
+    required this.category,
+    required this.store,
+    required this.price,
+    required this.icon,
+    required this.color,
+  });
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+const List<Product> products = [
+  Product(
+    name: 'سماعات لاسلكية',
+    category: 'إلكترونيات',
+    store: 'متجر التقنية',
+    price: 15,
+    icon: Icons.headphones,
+    color: Color(0xFFE0EAFE),
+  ),
+  Product(
+    name: 'حقيبة أنيقة',
+    category: 'أزياء',
+    store: 'أناقة ستور',
+    price: 12,
+    icon: Icons.shopping_bag,
+    color: Color(0xFFFFE7D6),
+  ),
+  Product(
+    name: 'ساعة يد',
+    category: 'إكسسوارات',
+    store: 'لمسة فاخرة',
+    price: 20,
+    icon: Icons.watch,
+    color: Color(0xFFE8E0FF),
+  ),
+  Product(
+    name: 'نبات منزلي',
+    category: 'المنزل',
+    store: 'حديقة البيت',
+    price: 5,
+    icon: Icons.yard,
+    color: Color(0xFFDDF4E4),
+  ),
+  Product(
+    name: 'حذاء رياضي',
+    category: 'أزياء',
+    store: 'أناقة ستور',
+    price: 25,
+    icon: Icons.directions_run,
+    color: Color(0xFFFFE4E4),
+  ),
+  Product(
+    name: 'مصباح مكتبي',
+    category: 'المنزل',
+    store: 'بيت العائلة',
+    price: 8,
+    icon: Icons.light,
+    color: Color(0xFFFFF0C9),
+  ),
+];
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+const List<String> categories = [
+  'الكل',
+  'إلكترونيات',
+  'أزياء',
+  'المنزل',
+  'إكسسوارات',
+];
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int selectedTab = 0;
+  String selectedCategory = 'الكل';
+  String searchText = '';
+  final Set<String> favorites = {};
+  final Map<String, int> cart = {};
+
+  List<Product> get filteredProducts {
+    return products.where((product) {
+      final matchesCategory = selectedCategory == 'الكل' ||
+          product.category == selectedCategory;
+      final query = searchText.trim().toLowerCase();
+      final matchesSearch = query.isEmpty ||
+          product.name.toLowerCase().contains(query) ||
+          product.store.toLowerCase().contains(query) ||
+          product.category.toLowerCase().contains(query);
+
+      final matchesTab = selectedTab != 1 ||
+          favorites.contains(product.name);
+      final matchesCart = selectedTab != 2 || (cart[product.name] ?? 0) > 0;
+
+      return matchesCategory &&
+          matchesSearch &&
+          matchesTab &&
+          matchesCart;
+    }).toList();
+  }
+
+  int get cartCount =>
+      cart.values.fold(0, (total, quantity) => total + quantity);
+
+  double get cartTotal {
+    double total = 0;
+    for (final product in products) {
+      total += product.price * (cart[product.name] ?? 0);
+    }
+    return total;
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Row(
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: mahalliGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.storefront,
+                color: Colors.white,
+                size: 25,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'محلّي',
+              style: TextStyle(
+                color: mahalliGreen,
+                fontSize: 25,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'الإشعارات',
+            onPressed: () => showMessage('ستتوفر الإشعارات لاحقًا'),
+            icon: const Icon(Icons.notifications_none),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      body: selectedTab == 3
+          ? buildAccountPage()
+          : buildShoppingPage(),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedTab,
+        backgroundColor: Colors.white,
+        indicatorColor: mahalliGreen.withValues(alpha: 0.12),
+        onDestinationSelected: (index) {
+          setState(() => selectedTab = index);
+        },
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'الرئيسية',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'المفضلة',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text('$cartCount'),
+              child: const Icon(Icons.shopping_cart_outlined),
+            ),
+            selectedIcon: const Icon(Icons.shopping_cart),
+            label: 'السلة',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'حسابي',
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget buildShoppingPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF087F5B), Color(0xFF20A879)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'كل ما تحب، في محلّي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'اكتشف متاجر ومنتجات تناسبك',
+                style: TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.local_mall, color: Colors.white, size: 28),
+                  SizedBox(width: 8),
+                  Text(
+                    'تسوّق من مكانك بسهولة',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          onChanged: (value) => setState(() => searchText = value),
+          decoration: InputDecoration(
+            hintText: 'ابحث عن منتج أو متجر...',
+            prefixIcon: const Icon(Icons.search, color: mahalliGreen),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        sectionTitle('التصنيفات', 'اكتشف ما يناسبك'),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 46,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final category = categories[index];
+              final selected = selectedCategory == category;
+              return ChoiceChip(
+                label: Text(category),
+                selected: selected,
+                selectedColor: mahalliGreen,
+                backgroundColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+                onSelected: (_) {
+                  setState(() => selectedCategory = category);
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        sectionTitle(
+          selectedTab == 1
+              ? 'منتجاتك المفضلة'
+              : selectedTab == 2
+                  ? 'سلة مشترياتك'
+                  : 'منتجات مميزة',
+          'الأسعار بالدينار الأردني',
+        ),
+        const SizedBox(height: 14),
+        if (selectedTab == 2 && cart.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'إجمالي السلة',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '${cartTotal.toStringAsFixed(2)} د.أ',
+                  style: const TextStyle(
+                    color: mahalliGreen,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (filteredProducts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(35),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 55,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  selectedTab == 1
+                      ? 'لم تضف منتجات إلى المفضلة بعد'
+                      : selectedTab == 2
+                          ? 'سلة المشتريات فارغة'
+                          : 'لا توجد منتجات مطابقة للبحث',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filteredProducts.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.68,
+            ),
+            itemBuilder: (context, index) {
+              final product = filteredProducts[index];
+              return productCard(product);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget sectionTitle(String title, String subtitle) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget productCard(Product product) {
+    final isFavorite = favorites.contains(product.name);
+    final quantity = cart[product.name] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFECEFED)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: product.color,
+                  child: Icon(
+                    product.icon,
+                    size: 76,
+                    color: mahalliGreen,
+                  ),
+                ),
+                Positioned(
+                  top: 7,
+                  left: 7,
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 20,
+                      onPressed: () {
+                        setState(() {
+                          if (isFavorite) {
+                            favorites.remove(product.name);
+                          } else {
+                            favorites.add(product.name);
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
+                if (quantity > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: mahalliGreen,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'في السلة: $quantity',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              product.store,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${product.price.toStringAsFixed(2)} د.أ',
+                    style: const TextStyle(
+                      color: mahalliGreen,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton.filled(
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      backgroundColor: mahalliGreen,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        cart[product.name] = quantity + 1;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('أُضيف ${product.name} إلى السلة'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.add_shopping_cart,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (selectedTab == 2)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        if (quantity <= 1) {
+                          cart.remove(product.name);
+                        } else {
+                          cart[product.name] = quantity - 1;
+                        }
+                      });
+                    },
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                  Text('$quantity'),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        cart[product.name] = quantity + 1;
+                      });
+                    },
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildAccountPage() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const SizedBox(height: 25),
+        const CircleAvatar(
+          radius: 42,
+          backgroundColor: Color(0xFFDDF4E4),
+          child: Icon(Icons.person, size: 48, color: mahalliGreen),
+        ),
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            'أهلًا بك في محلّي',
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Center(
+          child: Text(
+            'حسابك يجمع مشترياتك ومتجرك في مكان واحد',
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 25),
+        accountOption(Icons.login, 'تسجيل الدخول', 'قريبًا'),
+        accountOption(Icons.storefront, 'إنشاء متجر', 'قريبًا'),
+        accountOption(Icons.receipt_long, 'طلباتي', 'قريبًا'),
+        accountOption(Icons.support_agent, 'المساعدة والدعم', 'قريبًا'),
+        accountOption(Icons.info_outline, 'عن محلّي', 'سوق المتاجر المحلي'),
+      ],
+    );
+  }
+
+  Widget accountOption(IconData icon, String title, String subtitle) {
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: Icon(icon, color: mahalliGreen),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_left),
+        onTap: () => showMessage('$title: ستتم إضافتها في المرحلة القادمة'),
+      ),
+    );
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
