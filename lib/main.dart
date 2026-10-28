@@ -746,7 +746,7 @@ class _HomePageState extends State<HomePage> {
                                   );
 
                                   if (response.session == null) {
-                                    if (!mounted) return;
+                                    if (!dialogContext.mounted) return;
                                     Navigator.pop(dialogContext);
                                     showMessage(
                                       'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.',
@@ -761,7 +761,7 @@ class _HomePageState extends State<HomePage> {
                                   );
                                 }
 
-                                if (!mounted) return;
+                                if (!dialogContext.mounted) return;
 
                                 setState(() {
                                   currentUser = Supabase
