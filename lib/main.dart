@@ -8,6 +8,17 @@ Future<void> main() async {
     url: 'https://dmlvymwzsmbzfxgqyafx.supabase.co',
     publishableKey: 'sb_publishable_CiJl0yHA-MI24qCo-BKeDg_BNqPt5Na',
   );
+   try {
+    final products = await Supabase.instance.client
+        .from('products')
+        .select('id')
+        .limit(1);
+
+    debugPrint('نجح الاتصال بـ Supabase! عدد النتائج: ${products.length}');
+  } catch (error) {
+    debugPrint('فشل اختبار Supabase: $error');
+  }
+
 
   runApp(const MahalliApp());
 }
@@ -127,9 +138,55 @@ class _HomePageState extends State<HomePage> {
   String searchText = '';
   final Set<String> favorites = {};
   final Map<String, int> cart = {};
+    List<Product> databaseProducts = [];
 
-  List<Product> get filteredProducts {
-    return products.where((product) {
+  @override
+  void initState() {
+    super.initState();
+    loadDatabaseProducts();
+  }
+
+  Future<void> loadDatabaseProducts() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('products')
+          .select('name, description, price, category');
+
+      final loadedProducts = data.map<Product>((item) {
+        final category = item['category']?.toString() ?? 'أخرى';
+
+        return Product(
+          name: item['name']?.toString() ?? 'منتج',
+          category: category,
+          store: 'متجر محلّي',
+          price: (item['price'] as num?)?.toDouble() ?? 0,
+          icon: category == 'إلكترونيات'
+              ? Icons.devices
+              : category == 'أزياء'
+                  ? Icons.shopping_bag
+                  : category == 'المنزل'
+                      ? Icons.home
+                      : Icons.shopping_bag_outlined,
+          color: const Color(0xFFE0EAFE),
+        );
+      }).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        databaseProducts = loadedProducts;
+      });
+
+      debugPrint('تم تحميل ${loadedProducts.length} منتج من Supabase');
+    } catch (error) {
+      debugPrint('تعذر تحميل المنتجات من Supabase: $error');
+    }
+  }
+ List<Product> get filteredProducts {
+    final sourceProducts =
+        databaseProducts.isNotEmpty ? databaseProducts : products;
+
+    return sourceProducts.where((product) {
       final matchesCategory = selectedCategory == 'الكل' ||
           product.category == selectedCategory;
       final query = searchText.trim().toLowerCase();
