@@ -1064,9 +1064,12 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
       widget.onMessage('تم حفظ بيانات المتجر بنجاح');
       setState(() {});
     } catch (error) {
-      widget.onMessage(
-        'تعذر حفظ المتجر. تحقق من الاتصال بقاعدة البيانات.',
-      );
+  debugPrint('خطأ حفظ المتجر: $error');
+
+  widget.onMessage(
+    'فشل الحفظ: $error',
+  );
+}
     } finally {
       if (mounted) {
         setState(() => isSaving = false);
