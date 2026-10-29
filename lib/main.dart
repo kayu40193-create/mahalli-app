@@ -1317,7 +1317,7 @@ class _AddProductPageState extends State<AddProductPage> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            initialvalue: category,
+            initialValue: category,
             decoration: const InputDecoration(
               labelText: 'التصنيف',
               border: OutlineInputBorder(),
