@@ -258,9 +258,11 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 6),
         ],
       ),
-      body: selectedTab == 3
-          ? buildAccountPage()
-          : buildShoppingPage(),
+       body: selectedTab == 4
+    ? buildAccountPage()
+    : selectedTab == 3
+        ? buildMyStorePage()
+        : buildShoppingPage(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedTab,
         backgroundColor: Colors.white,
@@ -289,10 +291,15 @@ class _HomePageState extends State<HomePage> {
             label: 'السلة',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'حسابي',
-          ),
+  icon: Icon(Icons.storefront_outlined),
+  selectedIcon: Icon(Icons.storefront),
+  label: 'متجري',
+),
+const NavigationDestination(
+  icon: Icon(Icons.person_outline),
+  selectedIcon: Icon(Icons.person),
+  label: 'حسابي',
+),
         ],
       ),
     );
@@ -661,6 +668,45 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+  Widget buildMyStorePage() {
+  final user = Supabase.instance.client.auth.currentUser;
+
+  if (user == null) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.storefront_outlined,
+              size: 64,
+              color: mahalliGreen,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'سجّل الدخول أولًا لإنشاء متجرك',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                setState(() => selectedTab = 4);
+              },
+              child: const Text('الذهاب إلى حسابي'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return StoreSetupPage(
+    userId: user.id,
+    onMessage: showMessage,
+  );
+}
   Widget buildAccountPage() {
     Future<void> showAuthDialog(bool isRegister) async {
       final emailController = TextEditingController();
@@ -922,6 +968,191 @@ showMessage(
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+}
+
+class StoreSetupPage extends StatefulWidget {
+  final String userId;
+  final void Function(String) onMessage;
+
+  const StoreSetupPage({
+    super.key,
+    required this.userId,
+    required this.onMessage,
+  });
+
+  @override
+  State<StoreSetupPage> createState() => _StoreSetupPageState();
+}
+
+class _StoreSetupPageState extends State<StoreSetupPage> {
+  final storeNameController = TextEditingController();
+  final descriptionController = TextEditingController();
+
+  bool isLoading = true;
+  bool isSaving = false;
+  bool storeExists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadStore();
+  }
+
+  Future<void> loadStore() async {
+    try {
+      final result = await Supabase.instance.client
+          .from('seller_stores')
+          .select('store_name, description')
+          .eq('id', widget.userId)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      if (result != null) {
+        storeNameController.text =
+            result['store_name']?.toString() ?? '';
+        descriptionController.text =
+            result['description']?.toString() ?? '';
+        storeExists = true;
+      }
+    } catch (error) {
+      widget.onMessage('تعذر تحميل بيانات المتجر');
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  Future<void> saveStore() async {
+    final name = storeNameController.text.trim();
+    final description = descriptionController.text.trim();
+
+    if (name.isEmpty) {
+      widget.onMessage('اكتب اسم المتجر أولًا');
+      return;
+    }
+
+    setState(() => isSaving = true);
+
+    try {
+      final data = {
+        'id': widget.userId,
+        'store_name': name,
+        'description': description,
+      };
+
+      if (storeExists) {
+        await Supabase.instance.client
+            .from('seller_stores')
+            .update({
+              'store_name': name,
+              'description': description,
+            })
+            .eq('id', widget.userId);
+      } else {
+        await Supabase.instance.client
+            .from('seller_stores')
+            .insert(data);
+        storeExists = true;
+      }
+
+      if (!mounted) return;
+
+      widget.onMessage('تم حفظ بيانات المتجر بنجاح');
+      setState(() {});
+    } catch (error) {
+      widget.onMessage(
+        'تعذر حفظ المتجر. تحقق من الاتصال بقاعدة البيانات.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    storeNameController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Icon(
+          Icons.storefront,
+          size: 72,
+          color: mahalliGreen,
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            storeExists ? 'إدارة متجري' : 'أنشئ متجرك الخاص',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'أدخل معلومات متجرك، ثم احفظها.',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        TextField(
+          controller: storeNameController,
+          decoration: const InputDecoration(
+            labelText: 'اسم المتجر',
+            prefixIcon: Icon(Icons.store),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: descriptionController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'وصف المتجر (اختياري)',
+            prefixIcon: Icon(Icons.description_outlined),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: isSaving ? null : saveStore,
+          icon: const Icon(Icons.save_outlined),
+          label: Text(
+            isSaving ? 'جارٍ الحفظ...' : 'حفظ بيانات المتجر',
+          ),
+        ),
+        if (storeExists) ...[
+          const SizedBox(height: 20),
+          const Card(
+            child: ListTile(
+              leading: Icon(
+                Icons.check_circle_outline,
+                color: mahalliGreen,
+              ),
+              title: Text('تم إنشاء متجرك'),
+              subtitle: Text(
+                'يمكنك تعديل الاسم والوصف وحفظ التغييرات.',
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -1,0 +1,927 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://dmlvymwzsmbzfxgqyafx.supabase.co',
+    publishableKey: 'sb_publishable_CiJl0yHA-MI24qCo-BKeDg_BNqPt5Na',
+  );
+   try {
+    final products = await Supabase.instance.client
+        .from('products')
+        .select('id')
+        .limit(1);
+
+    debugPrint('نجح الاتصال بـ Supabase! عدد النتائج: ${products.length}');
+  } catch (error) {
+    debugPrint('فشل اختبار Supabase: $error');
+  }
+
+
+  runApp(const MahalliApp());
+}
+
+const Color mahalliGreen = Color(0xFF087F5B);
+const Color backgroundColor = Color(0xFFF6F8F7);
+
+class MahalliApp extends StatelessWidget {
+  const MahalliApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'محلّي',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: mahalliGreen),
+        scaffoldBackgroundColor: backgroundColor,
+        fontFamily: 'Roboto',
+      ),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: HomePage(),
+      ),
+    );
+  }
+}
+
+class Product {
+  final String name;
+  final String category;
+  final String store;
+  final double price;
+  final IconData icon;
+  final Color color;
+
+  const Product({
+    required this.name,
+    required this.category,
+    required this.store,
+    required this.price,
+    required this.icon,
+    required this.color,
+  });
+}
+
+const List<Product> products = [
+  Product(
+    name: 'سماعات لاسلكية',
+    category: 'إلكترونيات',
+    store: 'متجر التقنية',
+    price: 15,
+    icon: Icons.headphones,
+    color: Color(0xFFE0EAFE),
+  ),
+  Product(
+    name: 'حقيبة أنيقة',
+    category: 'أزياء',
+    store: 'أناقة ستور',
+    price: 12,
+    icon: Icons.shopping_bag,
+    color: Color(0xFFFFE7D6),
+  ),
+  Product(
+    name: 'ساعة يد',
+    category: 'إكسسوارات',
+    store: 'لمسة فاخرة',
+    price: 20,
+    icon: Icons.watch,
+    color: Color(0xFFE8E0FF),
+  ),
+  Product(
+    name: 'نبات منزلي',
+    category: 'المنزل',
+    store: 'حديقة البيت',
+    price: 5,
+    icon: Icons.yard,
+    color: Color(0xFFDDF4E4),
+  ),
+  Product(
+    name: 'حذاء رياضي',
+    category: 'أزياء',
+    store: 'أناقة ستور',
+    price: 25,
+    icon: Icons.directions_run,
+    color: Color(0xFFFFE4E4),
+  ),
+  Product(
+    name: 'مصباح مكتبي',
+    category: 'المنزل',
+    store: 'بيت العائلة',
+    price: 8,
+    icon: Icons.light,
+    color: Color(0xFFFFF0C9),
+  ),
+];
+
+const List<String> categories = [
+  'الكل',
+  'إلكترونيات',
+  'أزياء',
+  'المنزل',
+  'إكسسوارات',
+];
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  User? currentUser = Supabase.instance.client.auth.currentUser;
+  int selectedTab = 0;
+  String selectedCategory = 'الكل';
+  String searchText = '';
+  final Set<String> favorites = {};
+  final Map<String, int> cart = {};
+    List<Product> databaseProducts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadDatabaseProducts();
+  }
+
+  Future<void> loadDatabaseProducts() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('products')
+          .select('name, description, price, category');
+
+      final loadedProducts = data.map<Product>((item) {
+        final category = item['category']?.toString() ?? 'أخرى';
+
+        return Product(
+          name: item['name']?.toString() ?? 'منتج',
+          category: category,
+          store: 'متجر محلّي',
+          price: (item['price'] as num?)?.toDouble() ?? 0,
+          icon: category == 'إلكترونيات'
+              ? Icons.devices
+              : category == 'أزياء'
+                  ? Icons.shopping_bag
+                  : category == 'المنزل'
+                      ? Icons.home
+                      : Icons.shopping_bag_outlined,
+          color: const Color(0xFFE0EAFE),
+        );
+      }).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        databaseProducts = loadedProducts;
+      });
+
+      debugPrint('تم تحميل ${loadedProducts.length} منتج من Supabase');
+    } catch (error) {
+      debugPrint('تعذر تحميل المنتجات من Supabase: $error');
+    }
+  }
+ List<Product> get filteredProducts {
+    final sourceProducts =
+        databaseProducts.isNotEmpty ? databaseProducts : products;
+
+    return sourceProducts.where((product) {
+      final matchesCategory = selectedCategory == 'الكل' ||
+          product.category == selectedCategory;
+      final query = searchText.trim().toLowerCase();
+      final matchesSearch = query.isEmpty ||
+          product.name.toLowerCase().contains(query) ||
+          product.store.toLowerCase().contains(query) ||
+          product.category.toLowerCase().contains(query);
+
+      final matchesTab = selectedTab != 1 ||
+          favorites.contains(product.name);
+      final matchesCart = selectedTab != 2 || (cart[product.name] ?? 0) > 0;
+
+      return matchesCategory &&
+          matchesSearch &&
+          matchesTab &&
+          matchesCart;
+    }).toList();
+  }
+
+  int get cartCount =>
+      cart.values.fold(0, (total, quantity) => total + quantity);
+
+  double get cartTotal {
+    double total = 0;
+    for (final product in products) {
+      total += product.price * (cart[product.name] ?? 0);
+    }
+    return total;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: mahalliGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.storefront,
+                color: Colors.white,
+                size: 25,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'محلّي',
+              style: TextStyle(
+                color: mahalliGreen,
+                fontSize: 25,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'الإشعارات',
+            onPressed: () => showMessage('ستتوفر الإشعارات لاحقًا'),
+            icon: const Icon(Icons.notifications_none),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
+      body: selectedTab == 3
+          ? buildAccountPage()
+          : buildShoppingPage(),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedTab,
+        backgroundColor: Colors.white,
+        indicatorColor: mahalliGreen.withValues(alpha: 0.12),
+        onDestinationSelected: (index) {
+          setState(() => selectedTab = index);
+        },
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'الرئيسية',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'المفضلة',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text('$cartCount'),
+              child: const Icon(Icons.shopping_cart_outlined),
+            ),
+            selectedIcon: const Icon(Icons.shopping_cart),
+            label: 'السلة',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'حسابي',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildShoppingPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF087F5B), Color(0xFF20A879)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'كل ما تحب، في محلّي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'اكتشف متاجر ومنتجات تناسبك',
+                style: TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.local_mall, color: Colors.white, size: 28),
+                  SizedBox(width: 8),
+                  Text(
+                    'تسوّق من مكانك بسهولة',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          onChanged: (value) => setState(() => searchText = value),
+          decoration: InputDecoration(
+            hintText: 'ابحث عن منتج أو متجر...',
+            prefixIcon: const Icon(Icons.search, color: mahalliGreen),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        sectionTitle('التصنيفات', 'اكتشف ما يناسبك'),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 46,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final category = categories[index];
+              final selected = selectedCategory == category;
+              return ChoiceChip(
+                label: Text(category),
+                selected: selected,
+                selectedColor: mahalliGreen,
+                backgroundColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+                onSelected: (_) {
+                  setState(() => selectedCategory = category);
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        sectionTitle(
+          selectedTab == 1
+              ? 'منتجاتك المفضلة'
+              : selectedTab == 2
+                  ? 'سلة مشترياتك'
+                  : 'منتجات مميزة',
+          'الأسعار بالدينار الأردني',
+        ),
+        const SizedBox(height: 14),
+        if (selectedTab == 2 && cart.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'إجمالي السلة',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '${cartTotal.toStringAsFixed(2)} د.أ',
+                  style: const TextStyle(
+                    color: mahalliGreen,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (filteredProducts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(35),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 55,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  selectedTab == 1
+                      ? 'لم تضف منتجات إلى المفضلة بعد'
+                      : selectedTab == 2
+                          ? 'سلة المشتريات فارغة'
+                          : 'لا توجد منتجات مطابقة للبحث',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filteredProducts.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.68,
+            ),
+            itemBuilder: (context, index) {
+              final product = filteredProducts[index];
+              return productCard(product);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget sectionTitle(String title, String subtitle) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget productCard(Product product) {
+    final isFavorite = favorites.contains(product.name);
+    final quantity = cart[product.name] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFECEFED)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: product.color,
+                  child: Icon(
+                    product.icon,
+                    size: 76,
+                    color: mahalliGreen,
+                  ),
+                ),
+                Positioned(
+                  top: 7,
+                  left: 7,
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 20,
+                      onPressed: () {
+                        setState(() {
+                          if (isFavorite) {
+                            favorites.remove(product.name);
+                          } else {
+                            favorites.add(product.name);
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
+                if (quantity > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: mahalliGreen,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'في السلة: $quantity',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              product.store,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${product.price.toStringAsFixed(2)} د.أ',
+                    style: const TextStyle(
+                      color: mahalliGreen,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton.filled(
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      backgroundColor: mahalliGreen,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        cart[product.name] = quantity + 1;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('أُضيف ${product.name} إلى السلة'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.add_shopping_cart,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (selectedTab == 2)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        if (quantity <= 1) {
+                          cart.remove(product.name);
+                        } else {
+                          cart[product.name] = quantity - 1;
+                        }
+                      });
+                    },
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                  Text('$quantity'),
+                  IconButton(
+                    onPressed: () {
+                      (() {
+                        cart[product.name] = quantity + 1;
+                      });
+                    },
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  Widget buildAccountPage() {
+    Future<void> showAuthDialog(bool isRegister) async {
+      final emailController = TextEditingController();
+      final passwordController = TextEditingController();
+      bool isLoading = false;
+      String? errorMessage;
+
+      try {
+        await showDialog(
+          context: context,
+          builder: (dialogContext) {
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                return AlertDialog(
+                  title: Text(
+                    isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                  ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'البريد الإلكتروني',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'كلمة المرور',
+                            prefixIcon: Icon(Icons.lock_outline),
+                          ),
+                        ),
+                        if (errorMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () => Navigator.pop(dialogContext),
+                      child: const Text('إلغاء'),
+                    ),
+                    FilledButton(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final email = emailController.text.trim();
+                              final password = passwordController.text;
+
+                              if (email.isEmpty || password.isEmpty) {
+                                setDialogState(() {
+                                  errorMessage =
+                                      'أدخل البريد الإلكتروني وكلمة المرور';
+                                });
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isLoading = true;
+                                errorMessage = null;
+                              });
+
+                              try {
+                                if (isRegister) {
+                                  final response = await Supabase
+                                      .instance.client.auth
+                                      .signUp(
+                                    email: email,
+                                    password: password,
+                                  );
+
+                                  if (response.session == null) {
+                                    if (!dialogContext.mounted) return;
+                                    Navigator.pop(dialogContext);
+                                    showMessage(
+                                      'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.',
+                                    );
+                                    return;
+                                  }
+                                } else {
+                                  await Supabase.instance.client.auth
+                                      .signInWithPassword(
+                                    email: email,
+                                    password: password,
+                                  );
+                                }
+
+  if (!mounted || !dialogContext.mounted) return;
+
+Navigator.pop(dialogContext);
+
+setState(() {
+  currentUser = Supabase.instance.client.auth.currentUser;
+});
+
+showMessage(
+  isRegister
+      ? 'تم إنشاء الحساب بنجاح'
+      : 'تم تسجيل الدخول بنجاح',
+);                             
+                              } catch (error) {
+                                setDialogState(() {
+                                  errorMessage =
+                                      'تعذر إتمام العملية. تحقق من البيانات وحاول مجددًا.';
+                                  isLoading = false;
+                                });
+                              }
+                            },
+                      child: Text(
+                        isLoading
+                            ? 'يرجى الانتظار...'
+                            : isRegister
+                                ? 'إنشاء الحساب'
+                                : 'دخول',
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      } finally {
+        emailController.dispose();
+        passwordController.dispose();
+      }
+    }
+
+    if (currentUser != null) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const SizedBox(height: 25),
+          const CircleAvatar(
+            radius: 42,
+            backgroundColor: Color(0xFFDDF4E4),
+            child: Icon(Icons.person, size: 48, color: mahalliGreen),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'أهلًا بك في محلّي',
+              style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(child: Text(currentUser!.email ?? '')),
+          const SizedBox(height: 25),
+          FilledButton.icon(
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (!mounted) return;
+              setState(() {
+                currentUser = null;
+              });
+              showMessage('تم تسجيل الخروج');
+            },
+            icon: const Icon(Icons.logout),
+            label: const Text('تسجيل الخروج'),
+          ),
+          const SizedBox(height: 12),
+          accountOption(
+            Icons.receipt_long,
+            'طلباتي',
+            'قريبًا',
+          ),
+          accountOption(
+            Icons.support_agent,
+            'المساعدة والدعم',
+            'قريبًا',
+          ),
+          accountOption(
+            Icons.info_outline,
+            'عن محلّي',
+            'سوق المتاجر المحلي',
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const SizedBox(height: 25),
+        const CircleAvatar(
+          radius: 42,
+          backgroundColor: Color(0xFFDDF4E4),
+          child: Icon(Icons.person, size: 48, color: mahalliGreen),
+        ),
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            'أهلًا بك في محلّي',
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Center(
+          child: Text(
+            'سجّل دخولك لتجربة تسوق أفضل',
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 25),
+        FilledButton.icon(
+          onPressed: () => showAuthDialog(false),
+          icon: const Icon(Icons.login),
+          label: const Text('تسجيل الدخول'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => showAuthDialog(true),
+          icon: const Icon(Icons.person_add_alt_1),
+          label: const Text('إنشاء حساب جديد'),
+        ),
+        const SizedBox(height: 20),
+        accountOption(
+          Icons.support_agent,
+          'المساعدة والدعم',
+          'قريبًا',
+        ),
+        accountOption(
+          Icons.info_outline,
+          'عن محلّي',
+          'سوق المتاجر المحلي',
+        ),
+      ],
+    );
+  }
+
+  Widget accountOption(IconData icon, String title, String subtitle) {
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: Icon(icon, color: mahalliGreen),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_left),
+        onTap: () => showMessage('$title: ستتم إضافتها في المرحلة القادمة'),
+      ),
+    );
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+}
