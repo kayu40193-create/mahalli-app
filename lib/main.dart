@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1137,6 +1138,26 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
           ),
         ),
         if (storeExists) ...[
+  const SizedBox(height: 12),
+  FilledButton.icon(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddProductPage(
+            userId: widget.userId,
+            onSaved: () {
+              widget.onMessage('تم تحديث المنتجات');
+            },
+          ),
+        ),
+      );
+    },
+    icon: const Icon(Icons.add_box_outlined),
+    label: const Text('إضافة منتج جديد'),
+  ),
+],
+        if (storeExists) ...[
           const SizedBox(height: 20),
           const Card(
             child: ListTile(
@@ -1152,6 +1173,184 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
           ),
         ],
       ],
+    );
+  }
+}
+class AddProductPage extends StatefulWidget {
+  final String userId;
+  final VoidCallback onSaved;
+
+  const AddProductPage({
+    super.key,
+    required this.userId,
+    required this.onSaved,
+  });
+
+  @override
+  State<AddProductPage> createState() => _AddProductPageState();
+}
+
+class _AddProductPageState extends State<AddProductPage> {
+  final nameController = TextEditingController();
+  final priceController = TextEditingController();
+  final descriptionController = TextEditingController();
+
+  final picker = ImagePicker();
+  String category = 'إلكترونيات';
+  XFile? selectedImage;
+  bool saving = false;
+
+  final categories = [
+    'إلكترونيات',
+    'أزياء',
+    'المنزل',
+    'إكسسوارات',
+    'أخرى',
+  ];
+
+  Future<void> chooseImage() async {
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null && mounted) {
+      setState(() => selectedImage = image);
+    }
+  }
+
+  Future<void> saveProduct() async {
+    final name = nameController.text.trim();
+    final price = double.tryParse(priceController.text.trim());
+
+    if (name.isEmpty || price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('أدخل اسم المنتج وسعرًا صحيحًا')),
+      );
+      return;
+    }
+
+    setState(() => saving = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      String? imageUrl;
+
+      if (selectedImage != null) {
+        final bytes = await selectedImage!.readAsBytes();
+        final path =
+            '${widget.userId}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        await supabase.storage
+            .from('product-images')
+            .uploadBinary(path, bytes);
+
+        imageUrl = supabase.storage
+            .from('product-images')
+            .getPublicUrl(path);
+      }
+
+      await supabase.from('products').insert({
+        'name': name,
+        'price': price,
+        'description': descriptionController.text.trim(),
+        'category': category,
+        'image_url': imageUrl,
+        'seller_id': widget.userId,
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تمت إضافة المنتج بنجاح')),
+      );
+
+      widget.onSaved();
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشلت إضافة المنتج: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    priceController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('إضافة منتج')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'اسم المنتج',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: priceController,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'السعر بالدينار الأردني',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: descriptionController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'وصف المنتج',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            value: category,
+            decoration: const InputDecoration(
+              labelText: 'التصنيف',
+              border: OutlineInputBorder(),
+            ),
+            items: categories
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => category = value);
+            },
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: chooseImage,
+            icon: const Icon(Icons.image_outlined),
+            label: Text(
+              selectedImage == null
+                  ? 'اختيار صورة المنتج'
+                  : 'تم اختيار الصورة',
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: saving ? null : saveProduct,
+            child: Text(saving ? 'جارٍ الحفظ...' : 'حفظ المنتج'),
+          ),
+        ],
+      ),
     );
   }
 }
