@@ -51,6 +51,7 @@ class MahalliApp extends StatelessWidget {
 
 class Product {
   final String name;
+  final String? imageUrl;
   final String category;
   final String store;
   final double price;
@@ -59,6 +60,7 @@ class Product {
 
   const Product({
     required this.name,
+    this.imageUrl,
     required this.category,
     required this.store,
     required this.price,
@@ -152,13 +154,13 @@ class _HomePageState extends State<HomePage> {
     try {
       final data = await Supabase.instance.client
           .from('products')
-          .select('name, description, price, category');
-
+          .select('name, description, price, category, image_url');
       final loadedProducts = data.map<Product>((item) {
         final category = item['category']?.toString() ?? 'أخرى';
 
         return Product(
           name: item['name']?.toString() ?? 'منتج',
+          imageUrl: item['image_url']?.toString(),
           category: category,
           store: 'متجر محلّي',
           price: (item['price'] as num?)?.toDouble() ?? 0,
@@ -515,11 +517,26 @@ const NavigationDestination(
               children: [
                 Container(
                   color: product.color,
-                  child: Icon(
-                    product.icon,
-                    size: 76,
-                    color: mahalliGreen,
-                  ),
+                  child: product.imageUrl != null &&
+        product.imageUrl!.isNotEmpty
+    ? Image.network(
+        product.imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Icon(
+            product.icon,
+            size: 76,
+            color: mahalliGreen,
+          );
+        },
+      )
+    : Icon(
+        product.icon,
+        size: 76,
+        color: mahalliGreen,
+      ),
                 ),
                 Positioned(
                   top: 7,
