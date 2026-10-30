@@ -968,6 +968,8 @@ showMessage(
     );
   }
 
+
+
   Widget accountOption(IconData icon, String title, String subtitle) {
     return Card(
       color: Colors.white,
@@ -978,7 +980,25 @@ showMessage(
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_left),
-        onTap: () => showMessage('$title: ستتم إضافتها في المرحلة القادمة'),
+        onTap: () {
+          if (title == 'عن محلّي') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AboutMahalliPage(),
+              ),
+            );
+          } else if (title == 'المساعدة والدعم') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SupportPage(),
+              ),
+            );
+          } else {
+            showMessage('$title: هذه الخدمة غير متاحة حاليًا');
+          }
+        },
       ),
     );
   }
@@ -990,7 +1010,175 @@ showMessage(
   }
 }
 
+class AboutMahalliPage extends StatelessWidget {
+  const AboutMahalliPage({super.key});
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F9F8),
+      appBar: AppBar(
+        title: const Text('عن محلّي'),
+        backgroundColor: mahalliGreen,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const SizedBox(height: 20),
+          Icon(
+            Icons.storefront,
+            size: 85,
+            color: mahalliGreen,
+          ),
+          const SizedBox(height: 20),
+          const Center(
+            child: Text(
+              'محلّي',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text(
+              'سوقك المحلي، أقرب إليك',
+              style: TextStyle(fontSize: 17),
+            ),
+          ),
+          const SizedBox(height: 25),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'ما هو محلّي؟',
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'محلّي منصة تسوّق إلكترونية تجمع المتاجر والمنتجات '
+                    'في مكان واحد، وتساعد العملاء على اكتشاف المنتجات '
+                    'والتعرّف على المتاجر المحلية بسهولة.',
+                    style: TextStyle(fontSize: 16, height: 1.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 15),
+          const Center(
+            child: Text(
+              'الإصدار 1.0.0',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SupportPage extends StatelessWidget {
+  const SupportPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F9F8),
+      appBar: AppBar(
+        title: const Text('المساعدة والدعم'),
+        backgroundColor: mahalliGreen,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'كيف يمكننا مساعدتك؟',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'إليك إجابات عن بعض الأسئلة الشائعة.',
+            style: TextStyle(fontSize: 15, color: Colors.grey),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: ExpansionTile(
+              leading: Icon(Icons.store, color: mahalliGreen),
+              title: const Text('كيف أنشئ متجري؟'),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'افتح صفحة حسابي، ثم اختر إنشاء متجري، '
+                    'واتبع الخطوات لإدخال معلومات المتجر.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Card(
+            child: ExpansionTile(
+              leading: Icon(Icons.add_box, color: mahalliGreen),
+              title: const Text('كيف أضيف منتجًا؟'),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'افتح صفحة متجري، ثم اختر إضافة منتج، '
+                    'وأدخل اسم المنتج وسعره ووصفه وصورته.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Card(
+            child: ExpansionTile(
+              leading: Icon(Icons.edit, color: mahalliGreen),
+              title: const Text('كيف أعدّل أو أحذف منتجًا؟'),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'من صفحة متجري، افتح المنتج المطلوب، '
+                    'ثم اختر التعديل أو الحذف.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Card(
+            child: ExpansionTile(
+              leading: Icon(Icons.person, color: mahalliGreen),
+              title: const Text('كيف أسجّل الدخول؟'),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'افتح صفحة حسابي واتبع خيارات التسجيل أو تسجيل الدخول '
+                    'المتاحة في التطبيق.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class StoreSetupPage extends StatefulWidget {
   final String userId;
   final void Function(String) onMessage;
