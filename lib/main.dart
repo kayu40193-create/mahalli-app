@@ -1217,7 +1217,7 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: category,
+                        initialValue: category,
                         decoration: const InputDecoration(
                           labelText: 'التصنيف',
                         ),
@@ -1422,7 +1422,7 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
                             width: 55,
                             height: 55,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) {
+                            errorBuilder: (_, _, _) {
                               return const Icon(
                                 Icons.inventory_2_outlined,
                               );
