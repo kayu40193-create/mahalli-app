@@ -990,6 +990,7 @@ showMessage(
   }
 }
 
+
 class StoreSetupPage extends StatefulWidget {
   final String userId;
   final void Function(String) onMessage;
@@ -1012,10 +1013,14 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
   bool isSaving = false;
   bool storeExists = false;
 
+  List<Map<String, dynamic>> myProducts = [];
+  bool isLoadingProducts = false;
+
   @override
   void initState() {
     super.initState();
     loadStore();
+    loadMyProducts();
   }
 
   Future<void> loadStore() async {
@@ -1041,6 +1046,32 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
       if (mounted) {
         setState(() => isLoading = false);
       }
+    }
+  }
+
+  Future<void> loadMyProducts() async {
+    if (!mounted) return;
+
+    setState(() => isLoadingProducts = true);
+
+    try {
+      final result = await Supabase.instance.client
+          .from('products')
+          .select('id, name, description, price, category, image_url')
+          .eq('seller_id', widget.userId)
+          .order('created_at', ascending: false);
+
+      if (!mounted) return;
+
+      setState(() {
+        myProducts = List<Map<String, dynamic>>.from(result);
+        isLoadingProducts = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() => isLoadingProducts = false);
+      widget.onMessage('تعذر تحميل المنتجات: $error');
     }
   }
 
@@ -1079,15 +1110,182 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
 
       if (!mounted) return;
 
-      widget.onMessage('تم حفظ بيانات المتجر بنجاح');
       setState(() {});
-       } catch (error) {
-      debugPrint('خطأ حفظ المتجر: $error');
+      widget.onMessage('تم حفظ بيانات المتجر بنجاح');
+    } catch (error) {
       widget.onMessage('فشل الحفظ: $error');
     } finally {
       if (mounted) {
         setState(() => isSaving = false);
       }
+    }
+  }
+
+  Future<void> deleteProduct(Map<String, dynamic> product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف المنتج'),
+        content: Text(
+          'هل تريد حذف "${product['name']}"؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await Supabase.instance.client
+          .from('products')
+          .delete()
+          .eq('id', product['id'])
+          .eq('seller_id', widget.userId);
+
+      await loadMyProducts();
+      widget.onMessage('تم حذف المنتج');
+    } catch (error) {
+      widget.onMessage('تعذر حذف المنتج: $error');
+    }
+  }
+
+  Future<void> editProduct(Map<String, dynamic> product) async {
+    final nameController = TextEditingController(
+      text: product['name']?.toString() ?? '',
+    );
+    final priceController = TextEditingController(
+      text: product['price']?.toString() ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: product['description']?.toString() ?? '',
+    );
+
+    final categories = [
+      'إلكترونيات',
+      'أزياء',
+      'المنزل',
+      'إكسسوارات',
+      'أخرى',
+    ];
+
+    String category = categories.contains(product['category'])
+        ? product['category'].toString()
+        : 'أخرى';
+
+    try {
+      await showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('تعديل المنتج'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'اسم المنتج',
+                        ),
+                      ),
+                      TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'السعر بالدينار',
+                        ),
+                      ),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'الوصف',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: category,
+                        decoration: const InputDecoration(
+                          labelText: 'التصنيف',
+                        ),
+                        items: categories.map((item) {
+                          return DropdownMenuItem(
+                            value: item,
+                            child: Text(item),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => category = value);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('إلغاء'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      final price = double.tryParse(
+                        priceController.text.trim(),
+                      );
+
+                      if (name.isEmpty || price == null || price <= 0) {
+                        widget.onMessage('تحقق من اسم المنتج والسعر');
+                        return;
+                      }
+
+                      try {
+                        await Supabase.instance.client
+                            .from('products')
+                            .update({
+                              'name': name,
+                              'price': price,
+                              'description':
+                                  descriptionController.text.trim(),
+                              'category': category,
+                            })
+                            .eq('id', product['id'])
+                            .eq('seller_id', widget.userId);
+
+                        if (!dialogContext.mounted) return;
+                        Navigator.pop(dialogContext);
+                        await loadMyProducts();
+                        widget.onMessage('تم تعديل المنتج بنجاح');
+                      } catch (error) {
+                        widget.onMessage('تعذر تعديل المنتج: $error');
+                      }
+                    },
+                    child: const Text('حفظ التعديل'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      nameController.dispose();
+      priceController.dispose();
+      descriptionController.dispose();
     }
   }
 
@@ -1101,7 +1299,9 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     return ListView(
@@ -1155,26 +1355,25 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
           ),
         ),
         if (storeExists) ...[
-  const SizedBox(height: 12),
-  FilledButton.icon(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AddProductPage(
-            userId: widget.userId,
-            onSaved: () {
-              widget.onMessage('تم تحديث المنتجات');
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddProductPage(
+                    userId: widget.userId,
+                    onSaved: () {
+                      loadMyProducts();
+                      widget.onMessage('تم تحديث المنتجات');
+                    },
+                  ),
+                ),
+              );
             },
+            icon: const Icon(Icons.add_box_outlined),
+            label: const Text('إضافة منتج جديد'),
           ),
-        ),
-      );
-    },
-    icon: const Icon(Icons.add_box_outlined),
-    label: const Text('إضافة منتج جديد'),
-  ),
-],
-        if (storeExists) ...[
           const SizedBox(height: 20),
           const Card(
             child: ListTile(
@@ -1184,15 +1383,85 @@ class _StoreSetupPageState extends State<StoreSetupPage> {
               ),
               title: Text('تم إنشاء متجرك'),
               subtitle: Text(
-                'يمكنك تعديل الاسم والوصف وحفظ التغييرات.',
+                'يمكنك تعديل بيانات المتجر وإدارة منتجاتك.',
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          const Text(
+            'منتجات متجري',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (isLoadingProducts)
+            const Center(
+              child: CircularProgressIndicator(),
+            )
+          else if (myProducts.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('لم تضف أي منتجات بعد'),
+              ),
+            )
+          else
+            ...myProducts.map((product) {
+              final imageUrl = product['image_url']?.toString();
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: imageUrl != null && imageUrl.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl,
+                            width: 55,
+                            height: 55,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) {
+                              return const Icon(
+                                Icons.inventory_2_outlined,
+                              );
+                            },
+                          ),
+                        )
+                      : const Icon(Icons.inventory_2_outlined),
+                  title: Text(product['name']?.toString() ?? ''),
+                  subtitle: Text(
+                    '${product['price']} د.أ - ${product['category']}',
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        editProduct(product);
+                      } else if (value == 'delete') {
+                        deleteProduct(product);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('تعديل'),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('حذف'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
         ],
       ],
     );
   }
 }
+
 class AddProductPage extends StatefulWidget {
   final String userId;
   final VoidCallback onSaved;
