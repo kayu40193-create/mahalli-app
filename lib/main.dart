@@ -839,6 +839,7 @@ showMessage(
       : 'تم تسجيل الدخول بنجاح',
 );                             
                               } catch (error) {
+                                if (!dialogContext.mounted) return;
                                 setDialogState(() {
                                   errorMessage =
                                       'تعذر إتمام العملية. تحقق من البيانات وحاول مجددًا.';
