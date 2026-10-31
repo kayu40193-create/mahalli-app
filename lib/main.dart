@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+FlutterError.onError = (details) {
+  FlutterError.presentError(details);
+  debugPrint('تفاصيل خطأ Flutter: ${details.exception}');
+  debugPrint('${details.stack}');
+};
 
+PlatformDispatcher.instance.onError = (error, stack) {
+  debugPrint('خطأ عام: $error');
+  debugPrint('$stack');
+  return true;
+};
   await Supabase.initialize(
     url: 'https://dmlvymwzsmbzfxgqyafx.supabase.co',
     publishableKey: 'sb_publishable_CiJl0yHA-MI24qCo-BKeDg_BNqPt5Na',
