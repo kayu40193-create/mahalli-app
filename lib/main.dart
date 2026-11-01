@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+
+Future<void> saveFlutterError(String message) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('mahalli_last_error', message);
+  } catch (_) {}
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,12 +18,14 @@ FlutterError.onError = (details) {
   FlutterError.presentError(details);
   debugPrint('تفاصيل خطأ Flutter: ${details.exception}');
   debugPrint('${details.stack}');
+unawaited(saveFlutterError('${details.exception}\n${details.stack}'));
 };
 
 PlatformDispatcher.instance.onError = (error, stack) {
   debugPrint('خطأ عام: $error');
   debugPrint('$stack');
-  return true;
+unawaited(saveFlutterError('$error\n$stack'));  
+return true;
 };
   await Supabase.initialize(
     url: 'https://dmlvymwzsmbzfxgqyafx.supabase.co',
